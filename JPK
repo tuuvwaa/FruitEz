@@ -6,26 +6,17 @@ print("https://www.facebook.com/tuanangg10")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local HttpService = game:GetService("HttpService")
+
+local FruitList = {"Dragon", "Leopard", "Kitsune", "Venom", "Control", "Spirit", "Dough", "Shadow", "Rumble", "Blizzard", "Gravity", "Portal", "Paw", "Magma", "Light", "Dark", "Ice", "Flame", "Gas", "Yeti"}
+
+local ServerHistory = {}
 
 local FruitRarity = {
     Mythical = {"Dragon", "Leopard", "Kitsune"},
     Legendary = {"Venom", "Control", "Spirit", "Dough", "Shadow", "Rumble", "Blizzard", "Gravity"},
-    Rare = {"Portal", "Paw", "Magma", "Light", "Dark", "Ice", "Flame", "Gas", "Yeti"},
 }
-
-local function getFruitRarity(fruitName)
-    for rarity, fruits in pairs(FruitRarity) do
-        for _, name in pairs(fruits) do
-            if string.find(fruitName:lower(), name:lower()) then
-                return rarity
-            end
-        end
-    end
-    return "Common"
-end
 
 local function notify(title, text, duration)
     game.StarterGui:SetCore("SendNotification", {
@@ -35,15 +26,8 @@ local function notify(title, text, duration)
     })
 end
 
-local function tweenToPosition(position)
-    local rootPart = LocalPlayer.Character:WaitForChild("HumanoidRootPart")
-    local tween = TweenService:Create(rootPart, TweenInfo.new(2, Enum.EasingStyle.Linear), {CFrame = CFrame.new(position)})
-    tween:Play()
-    tween.Completed:Wait()
-end
-
 local function findFruit()
-    for _, obj in ipairs(workspace:GetChildren()) do
+    for _, obj in pairs(workspace:GetChildren()) do
         if obj:IsA("Tool") and string.find(obj.Name:lower(), "fruit") then
             return obj
         end
@@ -51,16 +35,22 @@ local function findFruit()
     return nil
 end
 
+local function tweenTo(position)
+    local hrp = LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+    local tween = TweenService:Create(hrp, TweenInfo.new(2, Enum.EasingStyle.Linear), {CFrame = CFrame.new(position)})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
 local function openInventory()
-    VirtualInputManager:SendKeyEvent(true, "M", false, game)
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, "M", false, game)
     wait(1)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, LocalPlayer.PlayerGui.Main.Menu.InventoryButton, 0)
+    game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, true, LocalPlayer.PlayerGui.Main.Menu.InventoryButton, 0)
     wait(1)
 end
 
 local function isFruitInStorage(fruitName)
     openInventory()
-
     for _, item in pairs(LocalPlayer.PlayerGui.Main.Inventory.Container.Storage:GetChildren()) do
         if item:IsA("ImageButton") and item:FindFirstChild("ItemName") then
             if string.find(item.ItemName.Text:lower(), fruitName:lower()) then
@@ -73,96 +63,107 @@ end
 
 local function storeFruit()
     openInventory()
-
     for _, item in pairs(LocalPlayer.PlayerGui.Main.Inventory.Container.Storage:GetChildren()) do
         if item:IsA("ImageButton") and item:FindFirstChild("ItemName") and string.find(item.ItemName.Text:lower(), "fruit") then
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, item, 0)
+            game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, true, item, 0)
             wait(1)
-            notify("Đã Lưu Trái!", "Trái đã được lưu vào kho đồ.", 5)
+            notify("Đã Lưu Trái", "Trái đã được lưu vào kho đồ!", 5)
             return true
         end
     end
-
-    notify("Lỗi!", "Không tìm thấy trái trong kho!", 5)
+    notify("Lỗi", "Không tìm thấy trái trong kho!", 5)
     return false
 end
 
-local function getFruitServers()
-    local data = HttpService:JSONDecode(game:HttpGet("https://bloxfruitapi.vercel.app/api/fruits/servers"))
-    local fruitServers = {}
-    
-    for _, server in pairs(data.servers) do
-        if server.fruitFound then
-            table.insert(fruitServers, server.id)
-        end
-    end
-
-    return fruitServers
-end
-
-local function hopToFruitServer()
-    notify("Hop Server", "Đang tìm server có trái...", 5)
-
-    local fruitServers = getFruitServers()
-
-    if #fruitServers == 0 then
-        notify("Không Tìm Thấy Server Có Trái!", "Thử lại sau 5 giây...", 5)
-        wait(5)
-        hopToFruitServer()
-        return
-    end
-
-    local targetServer = fruitServers[math.random(1, #fruitServers)]
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServer, LocalPlayer)
-end
-
---// Start check server hiện tại
-notify("Check Trái", "Kiểm tra trái trong server này...", 5)
-wait(5)
-
-local fruit = findFruit()
-
-if fruit then
-    notify("Tìm Thấy Trái!", "Bay tới nhặt: "..fruit.Name, 5)
-
-    tweenToPosition(fruit.Handle.Position)
-    wait(0.5)
-
-    LocalPlayer.Character:WaitForChild("Humanoid"):EquipTool(fruit)
-    notify("Nhặt Thành Công!", "Trái: " .. fruit.Name, 5)
-
-    local rarity = getFruitRarity(fruit.Name)
-
-    if rarity == "Mythical" or rarity == "Legendary" then
-        notify("Trái Hiếm - "..rarity, "Kiểm tra kho...", 5)
-
-        if isFruitInStorage(fruit.Name) then
-            notify("Trái Đã Có Trong Kho!", "Cầm trái này và ở lại.", 10)
-            return
-        else
-            notify("Chưa Có Trái Này!", "Lưu vào kho và hop tiếp.", 5)
-            if storeFruit() then
-                wait(2)
-                hopToFruitServer()
-            else
-                notify("Lưu Thất Bại!", "Thử lại ở server mới.", 5)
-                wait(2)
-                hopToFruitServer()
+local function getFruitRarity(fruitName)
+    for rarity, list in pairs(FruitRarity) do
+        for _, name in pairs(list) do
+            if string.find(fruitName:lower(), name:lower()) then
+                return rarity
             end
         end
-    else
-        notify("Trái "..rarity, "Lưu vào kho và hop tiếp.", 5)
-        if storeFruit() then
-            wait(2)
-            hopToFruitServer()
-        else
-            notify("Lưu Thất Bại!", "Thử lại ở server mới.", 5)
-            wait(2)
-            hopToFruitServer()
+    end
+    return "Common"
+end
+
+local function getNewServer()
+    local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+    for _, server in pairs(servers.data) do
+        if server.id ~= game.JobId and not table.find(ServerHistory, server.id) then
+            table.insert(ServerHistory, server.id)
+            return server.id
         end
     end
-else
-    notify("Không Có Trái!", "Tự động tìm server khác có trái.", 5)
-    wait(3)
-    hopToFruitServer()
+    return nil
 end
+
+local function hopServer()
+    notify("Hop Server", "Đang tìm server mới...", 5)
+    local newServer = getNewServer()
+    if newServer then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, newServer, LocalPlayer)
+    else
+        notify("Lỗi", "Không tìm được server mới! Thử lại sau.", 5)
+        wait(5)
+        hopServer()
+    end
+end
+
+local function checkForFruit()
+    notify("Kiểm Tra Server", "Đang kiểm tra xem có trái không...", 5)
+    local foundFruit = nil
+
+    for i = 1, 5 do
+        foundFruit = findFruit()
+        if foundFruit then break end
+        wait(1)
+    end
+
+    if foundFruit then
+        local fruitName = foundFruit.Name
+        local fruitPos = foundFruit.Handle.Position
+        local distance = (LocalPlayer.Character.HumanoidRootPart.Position - fruitPos).Magnitude
+
+        notify("Tìm Thấy Trái!", fruitName.." - Cách: "..math.floor(distance).."m", 5)
+
+        -- ESP hiển thị trái (nếu cần)
+        local esp = Instance.new("BillboardGui", foundFruit)
+        esp.Size = UDim2.new(0, 200, 0, 50)
+        esp.Adornee = foundFruit.Handle
+        esp.AlwaysOnTop = true
+
+        local textLabel = Instance.new("TextLabel", esp)
+        textLabel.Size = UDim2.new(1, 0, 1, 0)
+        textLabel.Text = fruitName.." - "..math.floor(distance).."m"
+        textLabel.TextColor3 = Color3.fromRGB(255, 85, 0)
+        textLabel.BackgroundTransparency = 1
+        textLabel.TextStrokeTransparency = 0
+
+        tweenTo(fruitPos)
+        wait(0.5)
+
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):EquipTool(foundFruit)
+
+        local rarity = getFruitRarity(fruitName)
+
+        if rarity == "Mythical" or rarity == "Legendary" then
+            if isFruitInStorage(fruitName) then
+                notify("Trái Hiếm Đã Có", "Giữ trái này không hop!", 5)
+                return
+            else
+                storeFruit()
+                hopServer()
+            end
+        else
+            storeFruit()
+            hopServer()
+        end
+    else
+        notify("Không Có Trái!", "Đợi 3s rồi hop server.", 5)
+        wait(3)
+        hopServer()
+    end
+end
+
+--// Start
+checkForFruit()
